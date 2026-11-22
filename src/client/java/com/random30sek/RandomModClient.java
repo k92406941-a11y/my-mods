@@ -19,15 +19,28 @@ public class RandomModClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        KeyBinding.Category category = KeyBinding.Category.create(Identifier.of("random30sek", "main"));
+
         KeyBinding toggleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.random30sek.toggle",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_TAB,
-                KeyBinding.Category.create(Identifier.of("random30sek", "main"))));
+                category));
+
+        // Запасная клавиша на случай, если TAB конфликтует со списком игроков
+        KeyBinding altKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.random30sek.toggle_alt",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_R,
+                category));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (toggleKey.wasPressed()) {
-                if (client.player != null) ClientPlayNetworking.send(new TogglePayload());
+            boolean pressed = false;
+            while (toggleKey.wasPressed()) pressed = true;
+            while (altKey.wasPressed()) pressed = true;
+            if (pressed && client.player != null) {
+                client.player.sendMessage(Text.literal("30sekRandom: клавиша нажата"), false);
+                ClientPlayNetworking.send(new TogglePayload());
             }
         });
 
@@ -44,7 +57,7 @@ public class RandomModClient implements ClientModInitializer {
             int x = 6, y = 6;
 
             String top;
-            if (!running) top = "30sekRandom: нажми TAB для старта";
+            if (!running) top = "30sekRandom: нажми TAB или R для старта";
             else top = "Событие: " + (eventName.isEmpty() ? "—" : eventName);
             String bottom = running ? "Следующее через: " + (ticksLeft + 19) / 20 + " c" : "";
 

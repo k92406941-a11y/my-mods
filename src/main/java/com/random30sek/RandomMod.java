@@ -15,6 +15,7 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -157,6 +158,6 @@ public class RandomMod implements ModInitializer {
             if (y >= h) { v = t; break; }
         }
         p.setVelocity(p.getVelocity().x, v, p.getVelocity().z);
-        p.velocityModified = true;
+        p.networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(p));
     }
 }

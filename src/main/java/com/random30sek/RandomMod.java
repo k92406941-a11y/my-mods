@@ -36,20 +36,43 @@ public class RandomMod implements ModInitializer {
             "Зомби-налёт",            // 0
             "Пропажа блоков",         // 1
             "Катапульта",             // 2
-            "Скорость III",           // 3
-            "Супер-прыжок",           // 4
+            "Скорость III",           // 3  (хорошее)
+            "Супер-прыжок",           // 4  (хорошее)
             "Слепота",                // 5
             "Криперы рядом",          // 6
             "Удары молний",           // 7
-            "Дождь из алмазов",       // 8
+            "Дождь из алмазов",       // 8  (хорошее)
             "Тяжёлые ноги",           // 9
             "Тьма",                   // 10
             "Голод",                  // 11
             "Горим!",                 // 12
             "Скелеты-снайперы",       // 13
             "Тошнота",                // 14
-            "Полное исцеление"        // 15
+            "Полное исцеление",       // 15 (хорошее)
+            "Яд",                     // 16
+            "Слабость",               // 17
+            "Усталость",              // 18
+            "Левитация",              // 19
+            "Иссушение",              // 20
+            "TNT рядом",              // 21
+            "Пауки",                  // 22
+            "Ведьмы",                 // 23
+            "Паутина вокруг",         // 24
+            "Лава под ногами",        // 25
+            "Потеря здоровья",        // 26
+            "Потеря еды"              // 27
     };
+
+    // Вес события: чем больше число, тем чаще оно выпадает.
+    // Плохие = 3, хорошие = 2. Хочешь ещё больше плохих — поставь хорошим 1.
+    private static final int[] WEIGHTS = new int[NAMES.length];
+    static {
+        for (int i = 0; i < WEIGHTS.length; i++) WEIGHTS[i] = 3;
+        WEIGHTS[3] = 2;
+        WEIGHTS[4] = 2;
+        WEIGHTS[8] = 2;
+        WEIGHTS[15] = 2;
+    }
 
     private final Random rnd = new Random();
     private boolean running = false;
@@ -95,9 +118,22 @@ public class RandomMod implements ModInitializer {
         });
     }
 
+    private int pickEvent() {
+        int total = 0;
+        for (int i = 0; i < NAMES.length; i++) {
+            if (i != lastEvent) total += WEIGHTS[i];
+        }
+        int roll = rnd.nextInt(total);
+        for (int i = 0; i < NAMES.length; i++) {
+            if (i == lastEvent) continue;
+            roll -= WEIGHTS[i];
+            if (roll < 0) return i;
+        }
+        return 0;
+    }
+
     private void startEvent(MinecraftServer server) {
-        int idx;
-        do { idx = rnd.nextInt(NAMES.length); } while (idx == lastEvent);
+        int idx = pickEvent();
         lastEvent = idx;
         eventName = NAMES[idx];
         LOGGER.info("Event started: {}", eventName);
@@ -126,13 +162,29 @@ public class RandomMod implements ModInitializer {
                 case 13 -> { int n = 1 + rnd.nextInt(3); for (int i = 0; i < n; i++) spawnNear(EntityType.SKELETON, w, p); }
                 case 14 -> effect(p, StatusEffects.NAUSEA, 0);
                 case 15 -> { p.setHealth(p.getMaxHealth()); p.getHungerManager().setFoodLevel(20); }
+                case 16 -> effect(p, StatusEffects.POISON, 1, 200);
+                case 17 -> effect(p, StatusEffects.WEAKNESS, 1);
+                case 18 -> effect(p, StatusEffects.MINING_FATIGUE, 2);
+                case 19 -> effect(p, StatusEffects.LEVITATION, 1, 100);
+                case 20 -> effect(p, StatusEffects.WITHER, 0, 100);
+                case 21 -> { int n = 1 + rnd.nextInt(3); for (int i = 0; i < n; i++) spawnNear(EntityType.TNT, w, p); }
+                case 22 -> { int n = 2 + rnd.nextInt(4); for (int i = 0; i < n; i++) spawnNear(EntityType.SPIDER, w, p); }
+                case 23 -> { int n = 1 + rnd.nextInt(2); for (int i = 0; i < n; i++) spawnNear(EntityType.WITCH, w, p); }
+                case 24 -> cobwebs(w, p);
+                case 25 -> w.setBlockState(p.getBlockPos().down(), Blocks.LAVA.getDefaultState(), 3);
+                case 26 -> p.setHealth(Math.max(1.0f, p.getHealth() / 2));
+                case 27 -> p.getHungerManager().setFoodLevel(2);
                 default -> {}
             }
         }
     }
 
     private void effect(ServerPlayerEntity p, RegistryEntry<StatusEffect> eff, int amp) {
-        p.addStatusEffect(new StatusEffectInstance(eff, PERIOD, amp));
+        effect(p, eff, amp, PERIOD);
+    }
+
+    private void effect(ServerPlayerEntity p, RegistryEntry<StatusEffect> eff, int amp, int ticks) {
+        p.addStatusEffect(new StatusEffectInstance(eff, ticks, amp));
     }
 
     private <T extends Entity> void spawnNear(EntityType<T> type, ServerWorld w, ServerPlayerEntity p) {
@@ -145,6 +197,18 @@ public class RandomMod implements ModInitializer {
         double dist = 2 + rnd.nextDouble() * 3;
         e.setPosition(p.getX() + Math.cos(ang) * dist, p.getY(), p.getZ() + Math.sin(ang) * dist);
         w.spawnEntity(e);
+    }
+
+    private void cobwebs(ServerWorld w, ServerPlayerEntity p) {
+        BlockPos c = p.getBlockPos();
+        for (int dx = -2; dx <= 2; dx++)
+            for (int dy = 0; dy <= 2; dy++)
+                for (int dz = -2; dz <= 2; dz++) {
+                    BlockPos pos = c.add(dx, dy, dz);
+                    if (w.getBlockState(pos).isAir()) {
+                        w.setBlockState(pos, Blocks.COBWEB.getDefaultState(), 3);
+                    }
+                }
     }
 
     private void vanishBlocks(ServerWorld w, ServerPlayerEntity p) {

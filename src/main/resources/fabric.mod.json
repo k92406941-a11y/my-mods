@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "random30sek",
+  "version": "${version}",
+  "name": "30sekRandom",
+  "description": "Каждые 30 секунд — случайное событие. Старт/стоп на TAB.",
+  "authors": ["you"],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.random30sek.RandomMod"],
+    "client": ["com.random30sek.RandomModClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

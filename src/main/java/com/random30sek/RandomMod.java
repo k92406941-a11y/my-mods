@@ -22,11 +22,14 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Random;
 
 public class RandomMod implements ModInitializer {
+    public static final Logger LOGGER = LoggerFactory.getLogger("30sekRandom");
     public static final int PERIOD = 30 * 20; // 30 секунд в тиках
 
     private static final String[] NAMES = {
@@ -63,10 +66,11 @@ public class RandomMod implements ModInitializer {
             running = !running;
             timer = PERIOD;
             eventName = "";
+            LOGGER.info("Toggle received, running = {}", running);
             MinecraftServer server = context.server();
-            Text msg = Text.literal(running ? "30sekRandom: ЗАПУЩЕН" : "30sekRandom: ОСТАНОВЛЕН");
+            Text msg = Text.literal(running ? "30sekRandom: ЗАПУЩЕН (первое событие через 30 сек)" : "30sekRandom: ОСТАНОВЛЕН");
             for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
-                p.sendMessage(msg, true);
+                p.sendMessage(msg, false);
             }
         });
 
@@ -75,7 +79,11 @@ public class RandomMod implements ModInitializer {
                 timer--;
                 if (timer <= 0) {
                     timer = PERIOD;
-                    startEvent(server);
+                    try {
+                        startEvent(server);
+                    } catch (Exception ex) {
+                        LOGGER.error("Event failed", ex);
+                    }
                 }
             }
             if (server.getTicks() % 5 == 0) {
@@ -92,9 +100,11 @@ public class RandomMod implements ModInitializer {
         do { idx = rnd.nextInt(NAMES.length); } while (idx == lastEvent);
         lastEvent = idx;
         eventName = NAMES[idx];
+        LOGGER.info("Event started: {}", eventName);
 
         List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
         for (ServerPlayerEntity p : players) {
+            p.sendMessage(Text.literal("Событие: " + eventName), false);
             ServerWorld w = (ServerWorld) p.getEntityWorld();
             switch (idx) {
                 case 0 -> { int n = 1 + rnd.nextInt(5); for (int i = 0; i < n; i++) spawnNear(EntityType.ZOMBIE, w, p); }
@@ -127,7 +137,10 @@ public class RandomMod implements ModInitializer {
 
     private <T extends Entity> void spawnNear(EntityType<T> type, ServerWorld w, ServerPlayerEntity p) {
         T e = type.create(w, SpawnReason.EVENT);
-        if (e == null) return;
+        if (e == null) {
+            LOGGER.warn("Could not create entity {}", type);
+            return;
+        }
         double ang = rnd.nextDouble() * Math.PI * 2;
         double dist = 2 + rnd.nextDouble() * 3;
         e.setPosition(p.getX() + Math.cos(ang) * dist, p.getY(), p.getZ() + Math.sin(ang) * dist);
@@ -137,6 +150,7 @@ public class RandomMod implements ModInitializer {
     private void vanishBlocks(ServerWorld w, ServerPlayerEntity p) {
         int r = 1 + rnd.nextInt(5);
         BlockPos c = p.getBlockPos();
+        int removed = 0;
         for (int dx = -r; dx <= r; dx++)
             for (int dy = -r; dy <= r; dy++)
                 for (int dz = -r; dz <= r; dz++) {
@@ -146,7 +160,10 @@ public class RandomMod implements ModInitializer {
                     BlockState s = w.getBlockState(pos);
                     if (s.isAir() || s.isOf(Blocks.BEDROCK)) continue;
                     w.setBlockState(pos, Blocks.AIR.getDefaultState(), 3);
+                    removed++;
                 }
+        LOGGER.info("Vanished {} blocks (radius {})", removed, r);
+        p.sendMessage(Text.literal("Пропало блоков: " + removed + " (радиус " + r + ")"), false);
     }
 
     private void launch(ServerPlayerEntity p) {
